@@ -6,15 +6,13 @@ macOS only lets you copy files, not cut them. CommandMove fixes that.
 
 ## Install
 
+Download the latest `CommandMove.dmg` from [Releases](../../releases), open it, and drag **CommandMove** to **Applications**.
+
+Or build from source:
+
 ```bash
 ./build.sh
-open build/CommandMove.app
-```
-
-Or move the app to your Applications folder:
-
-```bash
-cp -r build/CommandMove.app /Applications/
+open build/CommandMove.dmg
 ```
 
 ## Setup
@@ -57,7 +55,7 @@ Requires only `swiftc` (comes with Xcode Command Line Tools):
 ./build.sh
 ```
 
-This compiles the Swift sources, bundles them into a `.app`, and ad-hoc code signs it.
+This compiles the Swift sources, bundles them into a `.app`, ad-hoc code signs it, and creates `build/CommandMove.dmg` ready for GitHub Releases.
 
 ## License
 

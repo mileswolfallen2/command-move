@@ -11,14 +11,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusItem()
         setupMenu()
 
-        // Request notification permission
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { _, _ in }
 
-        // Check accessibility on launch
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.hotkeyManager.delegate = self
-            self.hotkeyManager.register()
-        }
+        hotkeyManager.delegate = self
+        hotkeyManager.register()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -36,6 +32,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let titleItem = NSMenuItem(title: "CommandMove", action: nil, keyEquivalent: "")
         titleItem.isEnabled = false
         menu.addItem(titleItem)
+        menu.addItem(NSMenuItem.separator())
+
+        let statusMenuItem = NSMenuItem(title: "Waiting for Accessibility...", action: nil, keyEquivalent: "")
+        statusMenuItem.isEnabled = false
+        statusMenuItem.tag = 200
+        menu.addItem(statusMenuItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let cutItem = NSMenuItem(title: "Cut Selected Files", action: #selector(cutFiles), keyEquivalent: "x")
@@ -56,10 +59,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        let statusItem2 = NSMenuItem(title: "No files cut", action: nil, keyEquivalent: "")
-        statusItem2.isEnabled = false
-        statusItem2.tag = 100
-        menu.addItem(statusItem2)
+        let clipStatus = NSMenuItem(title: "No files cut", action: nil, keyEquivalent: "")
+        clipStatus.isEnabled = false
+        clipStatus.tag = 100
+        menu.addItem(clipStatus)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let openSettingsItem = NSMenuItem(title: "Open Accessibility Settings", action: #selector(openAccessibility), keyEquivalent: "")
+        openSettingsItem.target = self
+        openSettingsItem.tag = 300
+        menu.addItem(openSettingsItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -72,28 +82,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func cutFiles() {
+        guard hotkeyManager.isActive else { return }
         fileCutPaste.cut()
-        updateStatus()
+        updateClipStatus()
     }
 
     @objc private func pasteFiles() {
+        guard hotkeyManager.isActive else { return }
         fileCutPaste.paste()
-        updateStatus()
+        updateClipStatus()
     }
 
     @objc private func clearClipboard() {
         fileCutPaste.clear()
-        updateStatus()
+        updateClipStatus()
+    }
+
+    @objc private func openAccessibility() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func quit() {
         NSApplication.shared.terminate(nil)
     }
 
-    private func updateStatus() {
+    private func updateClipStatus() {
         let count = fileCutPaste.clipboardCount
         if let item = menu.items.first(where: { $0.tag == 100 }) {
             item.title = count > 0 ? "\(count) file\(count == 1 ? "" : "s") cut — ready to paste" : "No files cut"
+        }
+    }
+
+    private func updateAccessibilityStatus(_ granted: Bool) {
+        if let item = menu.items.first(where: { $0.tag == 200 }) {
+            item.title = granted ? "Active — Cmd+X / Cmd+V ready" : "Waiting for Accessibility..."
+        }
+        if let item = menu.items.first(where: { $0.tag == 300 }) {
+            item.isHidden = granted
         }
     }
 }
@@ -108,6 +134,12 @@ extension AppDelegate: HotkeyManagerDelegate {
     func hotkeyPaste() {
         DispatchQueue.main.async { [weak self] in
             self?.pasteFiles()
+        }
+    }
+
+    func accessibilityDidChange(_ granted: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            self?.updateAccessibilityStatus(granted)
         }
     }
 }

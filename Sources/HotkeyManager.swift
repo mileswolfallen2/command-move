@@ -3,123 +3,152 @@ import Cocoa
 protocol HotkeyManagerDelegate: AnyObject {
     func hotkeyCut()
     func hotkeyPaste()
+    func accessibilityDidChange(_ granted: Bool)
 }
 
 class HotkeyManager {
     weak var delegate: HotkeyManagerDelegate?
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var selfRef: Unmanaged<HotkeyManager>?
+    private var retryTimer: Timer?
+    private var isRegistered = false
+
+    var isActive: Bool { isRegistered }
 
     func register() {
-        checkAccessibility()
+        // Trigger the system accessibility prompt if not yet trusted
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        let trusted = AXIsProcessTrustedWithOptions(options)
 
-        let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
-
-        selfRef = Unmanaged.passRetained(self)
-
-        guard let eventTap = CGEvent.tapCreate(
-            tap: .cghidEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: eventMask,
-            callback: { proxy, type, event, refcon -> Unmanaged<CGEvent>? in
-                guard let refcon = refcon else {
-                    return Unmanaged.passUnretained(event)
-                }
-                let manager = Unmanaged<HotkeyManager>.fromOpaque(refcon).takeUnretainedValue()
-
-                if let result = manager.handleEvent(proxy: proxy, type: type, event: event) {
-                    return result
-                }
-                return Unmanaged.passUnretained(event)
-            },
-            userInfo: selfRef?.toOpaque()
-        ) else {
-            print("Failed to create event tap. Check Accessibility permissions.")
-            showAccessibilityAlert()
-            return
+        if trusted {
+            createEventTap()
+        } else {
+            delegate?.accessibilityDidChange(false)
+            startRetrying()
         }
-
-        self.eventTap = eventTap
-        runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
-        CGEvent.tapEnable(tap: eventTap, enable: true)
     }
 
     func unregister() {
+        stopRetrying()
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
         }
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
         }
-        if let ref = selfRef {
-            ref.release()
-            selfRef = nil
-        }
         eventTap = nil
         runLoopSource = nil
+        isRegistered = false
     }
 
-    private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+    private func startRetrying() {
+        stopRetrying()
+        retryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.retry()
+        }
+    }
+
+    private func stopRetrying() {
+        retryTimer?.invalidate()
+        retryTimer = nil
+    }
+
+    private func retry() {
+        let trusted = AXIsProcessTrusted()
+        if trusted {
+            createEventTap()
+        }
+    }
+
+    private func createEventTap() {
+        guard !isRegistered else { return }
+
+        // Clean up any previous attempt
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+        }
+        if let source = runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+        }
+
+        let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
+
+        // Use a global pointer for the callback
+        let ptr = Unmanaged.passRetained(self).toOpaque()
+
+        guard let eventTap = CGEvent.tapCreate(
+            tap: .cghidEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: eventMask,
+            callback: hotkeyCallback,
+            userInfo: ptr
+        ) else {
+            // Tap creation failed — still not trusted or another issue
+            Unmanaged<HotkeyManager>.fromOpaque(ptr).release()
+            delegate?.accessibilityDidChange(false)
+            if retryTimer == nil {
+                startRetrying()
+            }
+            return
+        }
+
+        self.eventTap = eventTap
+        self.isRegistered = true
+
+        runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: eventTap, enable: true)
+
+        stopRetrying()
+        delegate?.accessibilityDidChange(true)
+        print("Event tap registered successfully.")
+    }
+
+    fileprivate func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap = eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
-            return nil
+            return Unmanaged.passUnretained(event)
         }
 
-        guard type == .keyDown else { return nil }
+        guard type == .keyDown else { return Unmanaged.passUnretained(event) }
 
         let flags = event.flags
         let isCommand = flags.contains(.maskCommand)
-        guard isCommand else { return nil }
+        guard isCommand else { return Unmanaged.passUnretained(event) }
 
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
-        // Cmd+X = cut
         if keyCode == 7 && isFinderFrontmost() {
             delegate?.hotkeyCut()
-            return nil // consume the event so Finder doesn't get it
+            return nil
         }
 
-        // Cmd+V = paste
         if keyCode == 9 && isFinderFrontmost() {
             delegate?.hotkeyPaste()
-            return nil // consume the event so Finder doesn't get it
+            return nil
         }
 
-        return nil
+        return Unmanaged.passUnretained(event)
     }
 
     private func isFinderFrontmost() -> Bool {
         guard let frontApp = NSWorkspace.shared.frontmostApplication else { return false }
         return frontApp.bundleIdentifier == "com.apple.finder"
     }
+}
 
-    private func checkAccessibility() {
-        let trusted = AXIsProcessTrusted()
-        if !trusted {
-            print("Accessibility not trusted. Prompting user...")
-        }
+private func hotkeyCallback(
+    proxy: CGEventTapProxy,
+    type: CGEventType,
+    event: CGEvent,
+    userInfo: UnsafeMutableRawPointer?
+) -> Unmanaged<CGEvent>? {
+    guard let userInfo = userInfo else {
+        return Unmanaged.passUnretained(event)
     }
-
-    private func showAccessibilityAlert() {
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "Accessibility Access Required"
-            alert.informativeText = "CommandMove needs Accessibility access to intercept keyboard shortcuts in Finder.\n\nPlease grant access in System Settings > Privacy & Security > Accessibility, then restart the app."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "Open System Settings")
-            alert.addButton(withTitle: "Quit")
-
-            let response = alert.runModal()
-            if response == .alertFirstButtonReturn {
-                let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-                NSWorkspace.shared.open(url)
-            }
-            NSApplication.shared.terminate(nil)
-        }
-    }
+    let manager = Unmanaged<HotkeyManager>.fromOpaque(userInfo).takeUnretainedValue()
+    return manager.handleEvent(type: type, event: event)
 }

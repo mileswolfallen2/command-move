@@ -55,22 +55,64 @@ codesign --force --sign - \
     --entitlements "${BUILD_DIR}/${APP_NAME}.entitlements" \
     "${APP_BUNDLE}"
 
-echo ""
-echo "Built: ${APP_BUNDLE}"
+# Create DMG
+DMG_NAME="${APP_NAME}.dmg"
+DMG_PATH="${BUILD_DIR}/${DMG_NAME}"
+DMG_TEMP="${BUILD_DIR}/dmg-staging"
+
+echo "Creating DMG..."
+rm -rf "${DMG_TEMP}"
+mkdir -p "${DMG_TEMP}"
+
+# Copy app into staging
+cp -R "${APP_BUNDLE}" "${DMG_TEMP}/"
+
+# Create Applications symlink for drag-and-drop install
+ln -s /Applications "${DMG_TEMP}/Applications"
+
+# Remove old DMG if exists
+rm -f "${DMG_PATH}"
+
+# Create DMG (read/write first, then convert to compressed)
+hdiutil create \
+    -srcfolder "${DMG_TEMP}" \
+    -volname "${APP_NAME}" \
+    -fs APFS \
+    -format UDRW \
+    "${BUILD_DIR}/${APP_NAME}-tmp.dmg"
+
+# Convert to compressed read-only
+hdiutil convert \
+    "${BUILD_DIR}/${APP_NAME}-tmp.dmg" \
+    -format UDZO \
+    -imagekey zlib-level=9 \
+    -o "${DMG_PATH}"
+
+rm -f "${BUILD_DIR}/${APP_NAME}-tmp.dmg"
+rm -rf "${DMG_TEMP}"
+
+# Get DMG size
+DMG_SIZE=$(ls -lh "${DMG_PATH}" | awk '{print $5}')
+
 echo ""
 echo "============================================"
+echo "  BUILD COMPLETE"
+echo "============================================"
+echo ""
+echo "  App:     ${APP_BUNDLE}"
+echo "  DMG:     ${DMG_PATH} (${DMG_SIZE})"
+echo ""
+echo "  To install:"
+echo "    open ${DMG_PATH}"
+echo "    Drag CommandMove to Applications"
+echo ""
 echo "  FIRST TIME SETUP REQUIRED"
-echo "============================================"
+echo "  1. macOS will prompt for Accessibility access."
+echo "     System Settings > Privacy & Security > Accessibility"
+echo "     Enable CommandMove"
 echo ""
-echo "  1. Open the app:"
-echo "     open ${APP_BUNDLE}"
-echo ""
-echo "  2. macOS will prompt for Accessibility access."
-echo "     Go to: System Settings > Privacy & Security > Accessibility"
-echo "     Enable the toggle for CommandMove"
-echo ""
-echo "  3. macOS may also prompt for Automation access"
+echo "  2. macOS may also prompt for Automation access"
 echo "     to control Finder. Click Allow."
 echo ""
-echo "  4. Use Cmd+X to cut files, Cmd+V to paste (move) them."
+echo "  3. Use Cmd+X to cut, Cmd+V to paste (move)."
 echo "============================================"
