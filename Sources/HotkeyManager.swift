@@ -16,9 +16,7 @@ class HotkeyManager {
     var isActive: Bool { isRegistered }
 
     func register() {
-        // Trigger the system accessibility prompt if not yet trusted
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        let trusted = AXIsProcessTrustedWithOptions(options)
+        let trusted = AXIsProcessTrusted()
 
         if trusted {
             createEventTap()

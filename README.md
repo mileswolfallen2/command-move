@@ -1,61 +1,63 @@
 # CommandMove
 
-True cut & paste for files on macOS. Select files in Finder, press **Cmd+X** to cut, navigate to another folder, and press **Cmd+V** to move them.
+CommandMove brings true cut-and-paste behavior to Finder on macOS. Select files in Finder, press Cmd+X to cut them, navigate to another folder, and press Cmd+V to move them.
 
-macOS only lets you copy files, not cut them. CommandMove fixes that.
+macOS only supports copy-and-paste for files, not true cut-and-paste. CommandMove fills that gap.
 
-## Install
+## Features
 
-Download the latest `CommandMove.dmg` from [Releases](../../releases), open it, and drag **CommandMove** to **Applications**.
+- Global Finder shortcuts: Cmd+X to cut and Cmd+V to paste/move files
+- Menu bar control for cutting, pasting, clearing the clipboard, and quitting
+- Finder context-menu support via a bundled service for cutting files
+- Automatic conflict handling: if a destination file already exists, a numbered copy is created
+- Existing files at the destination are skipped safely
 
-Or build from source:
+## Installation
+
+1. Download the latest DMG from [Releases](releases).
+2. Open the DMG and drag CommandMove to Applications.
+3. Launch CommandMove from Applications.
+
+### Build from source
+
+If you want to build locally, run:
 
 ```bash
 ./build.sh
 open build/CommandMove.dmg
 ```
 
+The build script compiles the Swift sources, creates the app bundle, signs it ad-hoc, and produces a distributable DMG in the build directory.
+
 ## Setup
 
-On first launch, macOS will ask for **Accessibility** access:
+On first launch, macOS may prompt for Accessibility access:
 
-1. Open **System Settings > Privacy & Security > Accessibility**
-2. Toggle **CommandMove** on
+1. Open System Settings > Privacy & Security > Accessibility
+2. Enable CommandMove
 
-You may also be prompted to allow **Automation** access to control Finder. Click Allow.
+You may also be prompted to allow Automation so the app can interact with Finder. Click Allow.
 
 ## Usage
 
-| Shortcut | Action |
-|----------|--------|
-| **Cmd+X** | Cut selected files in Finder |
-| **Cmd+V** | Paste (move) files to the current Finder folder |
-
-The app runs in the menu bar. Click the scissors icon to cut/paste manually, clear the clipboard, toggle **Open at Login**, or quit.
-
-- If a file with the same name exists at the destination, it automatically appends a number (e.g. `file 2.txt`).
-- Files already at the destination are skipped.
-
-## How It Works
-
-- **CGEvent tap** intercepts Cmd+X/Cmd+V globally and consumes the events before Finder receives them.
-- **AppleScript** reads the selected files and current folder from Finder.
-- **FileManager.moveItem** performs the actual file move.
+| Shortcut / Action | Result |
+|---|---|
+| Cmd+X in Finder | Cuts the selected files |
+| Cmd+V in Finder | Moves the cut files into the current folder |
+| Menu bar icon | Lets you cut, paste, clear the clipboard, or open Accessibility settings |
+| Finder context menu | Offers a Cut Files action through the bundled service |
 
 ## Requirements
 
 - macOS 13.0 or later
-- Accessibility permissions ( prompted on first launch )
+- Accessibility permissions granted for CommandMove
+- Xcode Command Line Tools (for building from source)
 
-## Building from Source
+## How it works
 
-Requires only `swiftc` (comes with Xcode Command Line Tools):
-
-```bash
-./build.sh
-```
-
-This compiles the Swift sources, bundles them into a `.app`, ad-hoc code signs it, and creates `build/CommandMove.dmg` ready for GitHub Releases.
+- A global event tap intercepts Cmd+X and Cmd+V while Finder is frontmost.
+- AppleScript queries Finder for the selected items and current folder.
+- The app uses FileManager.moveItem to perform the move operation.
 
 ## License
 

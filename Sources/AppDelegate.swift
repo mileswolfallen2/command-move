@@ -17,6 +17,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         hotkeyManager.delegate = self
         hotkeyManager.register()
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleServiceCutFiles),
+            name: NSNotification.Name("com.commandmove.cutFilesReady"),
+            object: nil
+        )
+
+        checkAppLocation()
+    }
+
+    private func checkAppLocation() {
+        let appPath = Bundle.main.bundlePath
+        let inApplications = appPath.hasPrefix("/Applications/") || appPath.hasPrefix(NSHomeDirectory() + "/Applications/")
+        guard !inApplications else { return }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            let alert = NSAlert()
+            alert.messageText = "Move to Applications?"
+            alert.informativeText = "For the right-click context menu to work, CommandMove needs to be in your Applications folder.\n\nMove it there now?"
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Move to Applications")
+            alert.addButton(withTitle: "Not Now")
+
+            if alert.runModal() == .alertFirstButtonReturn {
+                let dest = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask).first!
+                    .appendingPathComponent("CommandMove.app")
+                try? FileManager.default.removeItem(at: dest)
+                try? FileManager.default.moveItem(at: URL(fileURLWithPath: appPath), to: dest)
+                NSWorkspace.shared.open(dest)
+                NSApplication.shared.terminate(nil)
+            }
+        }
+    }
+
+    @objc private func handleServiceCutFiles() {
+        fileCutPaste.receiveFromService()
+        updateClipStatus()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -80,6 +118,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         openSettingsItem.tag = 300
         menu.addItem(openSettingsItem)
 
+        let openServicesItem = NSMenuItem(title: "Enable Right-Click Cut Menu", action: #selector(openServices), keyEquivalent: "")
+        openServicesItem.target = self
+        menu.addItem(openServicesItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(title: "Quit CommandMove", action: #selector(quit), keyEquivalent: "q")
@@ -110,6 +152,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openAccessibility() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
+    }
+
+    @objc private func openServices() {
+        // Open System Settings > Keyboard and show instructions
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.Keyboard") {
+            NSWorkspace.shared.open(url)
+        }
+        // Show a guide since there's no direct URL to the Services pane
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let alert = NSAlert()
+            alert.messageText = "Enable Cut Files Quick Action"
+            alert.informativeText = """
+            In the Keyboard settings that just opened:
+
+            1. Click "Keyboard Shortcuts..." at the bottom
+            2. Select "Services" in the left sidebar
+            3. Expand "Files and Folders"
+            4. Check "Cut Files (CommandMove)"
+
+            Then right-click files in Finder → Quick Actions → Cut Files
+            """
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
     }
 
     @objc private func toggleLoginItem() {

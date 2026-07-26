@@ -50,11 +50,39 @@ swiftc \
     Sources/FinderBridge.swift \
     Sources/FileCutPaste.swift
 
+# Build the Finder Service (right-click context menu)
+echo "Building Finder Service..."
+SERVICE_BUNDLE="${CONTENTS}/Library/Services/Cut Files (CommandMove).app"
+SERVICE_CONTENTS="${SERVICE_BUNDLE}/Contents"
+SERVICE_MACOS="${SERVICE_CONTENTS}/MacOS"
+mkdir -p "${SERVICE_MACOS}"
+cp Resources/ServiceInfo.plist "${SERVICE_CONTENTS}/Info.plist"
+swiftc \
+    -o "${SERVICE_MACOS}/CutFiles" \
+    -framework Cocoa \
+    -target "${TARGET}" \
+    -O \
+    Sources/Service/main.swift
+
 # Ad-hoc code sign (required for Accessibility + AppleScript on modern macOS)
 echo "Code signing (ad-hoc)..."
 codesign --force --sign - \
+    "${SERVICE_BUNDLE}"
+codesign --force --sign - \
     --entitlements "${BUILD_DIR}/${APP_NAME}.entitlements" \
     "${APP_BUNDLE}"
+
+# Verify service bundle has Info.plist
+echo "Verifying service bundle..."
+ls -la "${SERVICE_CONTENTS}/Info.plist"
+cat "${SERVICE_CONTENTS}/Info.plist" | head -5
+
+# Install service to ~/Library/Services/ for discovery
+echo "Installing service to ~/Library/Services/..."
+mkdir -p ~/Library/Services/
+rm -rf ~/Library/Services/"Cut Files (CommandMove).app"
+cp -R "${SERVICE_BUNDLE}" ~/Library/Services/
+echo "Service installed."
 
 # Create DMG
 DMG_NAME="${APP_NAME}.dmg"
