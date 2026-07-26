@@ -1,11 +1,13 @@
 import Cocoa
 import UserNotifications
+import ServiceManagement
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let hotkeyManager = HotkeyManager()
     private let fileCutPaste = FileCutPaste()
     private let menu = NSMenu()
+    private var loginItemMenuItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
@@ -66,6 +68,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        loginItemMenuItem = NSMenuItem(title: "Open at Login", action: #selector(toggleLoginItem), keyEquivalent: "")
+        loginItemMenuItem.target = self
+        loginItemMenuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        menu.addItem(loginItemMenuItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         let openSettingsItem = NSMenuItem(title: "Open Accessibility Settings", action: #selector(openAccessibility), keyEquivalent: "")
         openSettingsItem.target = self
         openSettingsItem.tag = 300
@@ -101,6 +110,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openAccessibility() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
+    }
+
+    @objc private func toggleLoginItem() {
+        let service = SMAppService.mainApp
+        if service.status == .enabled {
+            try? service.unregister()
+        } else {
+            try? service.register()
+        }
+        loginItemMenuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
     }
 
     @objc private func quit() {

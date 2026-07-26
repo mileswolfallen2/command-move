@@ -31,7 +31,7 @@ You may also be prompted to allow **Automation** access to control Finder. Click
 | **Cmd+X** | Cut selected files in Finder |
 | **Cmd+V** | Paste (move) files to the current Finder folder |
 
-The app runs in the menu bar. Click the scissors icon to cut/paste manually, clear the clipboard, or quit.
+The app runs in the menu bar. Click the scissors icon to cut/paste manually, clear the clipboard, toggle **Open at Login**, or quit.
 
 - If a file with the same name exists at the destination, it automatically appends a number (e.g. `file 2.txt`).
 - Files already at the destination are skipped.
@@ -44,7 +44,7 @@ The app runs in the menu bar. Click the scissors icon to cut/paste manually, cle
 
 ## Requirements
 
-- macOS 12.0 or later
+- macOS 13.0 or later
 - Accessibility permissions ( prompted on first launch )
 
 ## Building from Source

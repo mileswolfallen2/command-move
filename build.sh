@@ -29,9 +29,9 @@ cp Resources/CommandMove.entitlements "${BUILD_DIR}/${APP_NAME}.entitlements"
 # Detect architecture
 ARCH=$(uname -m)
 if [ "$ARCH" = "arm64" ]; then
-    TARGET="arm64-apple-macosx12.0"
+    TARGET="arm64-apple-macosx13.0"
 else
-    TARGET="x86_64-apple-macosx12.0"
+    TARGET="x86_64-apple-macosx13.0"
 fi
 
 # Compile Swift sources
@@ -41,6 +41,7 @@ swiftc \
     -framework Cocoa \
     -framework Carbon \
     -framework UserNotifications \
+    -framework ServiceManagement \
     -target "${TARGET}" \
     -O \
     Sources/main.swift \
