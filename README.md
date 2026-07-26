@@ -7,8 +7,9 @@ macOS only supports copy-and-paste for files, not true cut-and-paste. CommandMov
 ## Features
 
 - Global Finder shortcuts: Cmd+X to cut and Cmd+V to paste/move files
-- Menu bar control for cutting, pasting, clearing the clipboard, and quitting
-- Finder context-menu support via a bundled service for cutting files
+- Menu bar controls for cutting, pasting, clearing the clipboard, opening Accessibility settings, and quitting
+- Optional auto-launch at login with an Open at Login toggle
+- Finder right-click support through a bundled Quick Action / service for cutting files
 - Automatic conflict handling: if a destination file already exists, a numbered copy is created
 - Existing files at the destination are skipped safely
 
@@ -38,14 +39,16 @@ On first launch, macOS may prompt for Accessibility access:
 
 You may also be prompted to allow Automation so the app can interact with Finder. Click Allow.
 
+If you want to use the Finder right-click shortcut, make sure CommandMove is installed in your Applications folder and enable the Cut Files Quick Action from the menu bar’s Enable Right-Click Cut Menu item.
+
 ## Usage
 
 | Shortcut / Action | Result |
 |---|---|
 | Cmd+X in Finder | Cuts the selected files |
 | Cmd+V in Finder | Moves the cut files into the current folder |
-| Menu bar icon | Lets you cut, paste, clear the clipboard, or open Accessibility settings |
-| Finder context menu | Offers a Cut Files action through the bundled service |
+| Menu bar icon | Lets you cut, paste, clear the clipboard, enable login launch, or open Accessibility settings |
+| Finder right-click menu | Offers a Cut Files action through the bundled Quick Action / service |
 
 ## Requirements
 
